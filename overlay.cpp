@@ -1,9 +1,12 @@
-// overlay.cpp
 #include "overlay.h"
 #include <imgui.h>
 #include <imgui_impl_win32.h>
 #include <imgui_impl_dx11.h>
 #include "esp.h"
+#include "aimbot.h"
+#include "rcs.h"
+#include "memory.h"
+#include "offsets.h"
 
 HWND g_overlayWindow = NULL;
 ID3D11Device* g_pd3dDevice = NULL;
@@ -11,8 +14,12 @@ ID3D11DeviceContext* g_pd3dDeviceContext = NULL;
 IDXGISwapChain* g_pSwapChain = NULL;
 ID3D11RenderTargetView* g_mainRenderTargetView = NULL;
 
+extern HANDLE g_hProcess;
+extern uintptr_t g_moduleBase;
+
 bool CreateDeviceD3D(HWND hWnd) {
-    DXGI_SWAP_CHAIN_DESC sd = {};
+    DXGI_SWAP_CHAIN_DESC sd;
+    ZeroMemory(&sd, sizeof(sd));
     sd.BufferCount = 2;
     sd.BufferDesc.Width = 0;
     sd.BufferDesc.Height = 0;
@@ -30,96 +37,144 @@ bool CreateDeviceD3D(HWND hWnd) {
     UINT createDeviceFlags = 0;
     D3D_FEATURE_LEVEL featureLevel;
     const D3D_FEATURE_LEVEL featureLevelArray[2] = { D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_0, };
-    HRESULT res = D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, createDeviceFlags, featureLevelArray, 2, D3D11_SDK_VERSION, &sd, &g_pSwapChain, &g_pd3dDevice, &featureLevel, &g_pd3dDeviceContext);
-    if (res != S_OK) return false;
+
+    if (D3D11CreateDeviceAndSwapChain(NULL, D3D_DRIVER_TYPE_HARDWARE, NULL, createDeviceFlags, featureLevelArray, 2, D3D11_SDK_VERSION, &sd, &g_pSwapChain, &g_pd3dDevice, &featureLevel, &g_pd3dDeviceContext) != S_OK)
+        return false;
 
     ID3D11Texture2D* pBackBuffer;
-    g_pSwapChain->GetBuffer(0, IID_PPV_ARGS(&pBackBuffer));
+    g_pSwapChain->GetBuffer(0, __uuidof(ID3D11Texture2D), (LPVOID*)&pBackBuffer);
     g_pd3dDevice->CreateRenderTargetView(pBackBuffer, NULL, &g_mainRenderTargetView);
     pBackBuffer->Release();
+
     return true;
 }
 
-void RenderImGui(HANDLE hProcess, uintptr_t moduleBase, uintptr_t localPlayer) {
+extern namespace Config;
+
+void RenderOverlay() {
     ImGui_ImplDX11_NewFrame();
     ImGui_ImplWin32_NewFrame();
     ImGui::NewFrame();
 
     if (Config::showMenu) {
-        ImGui::Begin("CS2 Cheat Menu");
-        ImGui::Checkbox("ESP", &Config::espEnabled);
-        ImGui::Checkbox("Aimbot", &Config::aimbotEnabled);
-        ImGui::SliderFloat("Aimbot FOV", &Config::aimbotFov, 1.0f, 30.0f);
-        ImGui::SliderFloat("Aimbot Smooth", &Config::aimbotSmooth, 0.1f, 1.0f);
-        ImGui::Checkbox("RCS", &Config::rcsEnabled);
-        ImGui::SliderFloat("RCS Strength", &Config::rcsStrength, 0.5f, 2.0f);
+        ImGui::Begin("CS2 Tool", nullptr, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
+        ImGui::Text("CS2 Memory Visualization Tool");
+        ImGui::Separator();
+
+        if (ImGui::CollapsingHeader("Visualization")) {
+            ImGui::Checkbox("Enable Overlay", &Config::espEnabled);
+        }
+
+        if (ImGui::CollapsingHeader("Input Simulation")) {
+            ImGui::Checkbox("Enable Aimbot", &Config::aimbotEnabled);
+            ImGui::SliderFloat("FOV", &Config::aimbotFov, 1.0f, 30.0f, "%.1f degrees");
+            ImGui::SliderFloat("Smooth", &Config::aimbotSmooth, 0.01f, 1.0f, "%.2f");
+            const char* bones[] = { "Head", "Neck", "Chest" };
+            ImGui::Combo("Target Bone", &Config::aimbotBone, bones, IM_ARRAYSIZE(bones));
+        }
+
+        if (ImGui::CollapsingHeader("Recoil Compensation")) {
+            ImGui::Checkbox("Enable RCS", &Config::rcsEnabled);
+            ImGui::SliderFloat("Strength", &Config::rcsStrength, 0.5f, 2.0f, "%.2f");
+        }
+
         ImGui::End();
     }
 
-    if (Config::espEnabled) {
-        DrawESP(hProcess, moduleBase, localPlayer);
+    uintptr_t localPlayer = Memory::Read<uintptr_t>(g_hProcess, g_moduleBase + Offsets::dwLocalPlayerPawn);
+    if (localPlayer && Config::espEnabled) {
+        DrawESP(g_hProcess, g_moduleBase, localPlayer);
     }
 
+    ImGui::EndFrame();
     ImGui::Render();
+
     g_pd3dDeviceContext->OMSetRenderTargets(1, &g_mainRenderTargetView, NULL);
+    float clear_color[4] = { 0.0f, 0.0f, 0.0f, 0.0f };
+    g_pd3dDeviceContext->ClearRenderTargetView(g_mainRenderTargetView, clear_color);
     ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+
+    g_pSwapChain->Present(1, 0);
 }
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-    if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam)) return true;
+    if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam))
+        return true;
+
     switch (msg) {
-    case WM_DESTROY: PostQuitMessage(0); return 0;
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        return 0;
     }
+
     return DefWindowProc(hWnd, msg, wParam, lParam);
 }
 
 bool InitOverlay(HWND targetWindow) {
     RECT rect;
     GetWindowRect(targetWindow, &rect);
-    int width = rect.right - rect.left;
-    int height = rect.bottom - rect.top;
 
-    WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, WndProc, 0L, 0L, GetModuleHandle(NULL), NULL, NULL, NULL, NULL, "Overlay", NULL };
+    WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, WndProc, 0L, 0L, GetModuleHandle(NULL), NULL, NULL, (HBRUSH)GetStockObject(BLACK_BRUSH), NULL, L"OverlayWindow", NULL };
     RegisterClassEx(&wc);
 
-    g_overlayWindow = CreateWindowEx(WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_LAYERED, "Overlay", "Overlay", WS_POPUP, rect.left, rect.top, width, height, NULL, NULL, wc.hInstance, NULL);
-    SetLayeredWindowAttributes(g_overlayWindow, RGB(0,0,0), 0, ULW_COLORKEY);
-    ShowWindow(g_overlayWindow, SW_SHOW);
+    g_overlayWindow = CreateWindowEx(WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_LAYERED, L"OverlayWindow", L"Overlay", WS_POPUP,
+        rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top,
+        NULL, NULL, wc.hInstance, NULL);
 
-    if (!CreateDeviceD3D(g_overlayWindow)) return false;
+    if (!g_overlayWindow) return false;
+
+    SetLayeredWindowAttributes(g_overlayWindow, RGB(0, 0, 0), 0, LWA_COLORKEY);
+    ShowWindow(g_overlayWindow, SW_SHOW);
+    UpdateWindow(g_overlayWindow);
+
+    if (!CreateDeviceD3D(g_overlayWindow)) {
+        CleanupOverlay();
+        return false;
+    }
 
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO(); (void)io;
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+
     ImGui::StyleColorsDark();
+
     ImGui_ImplWin32_Init(g_overlayWindow);
     ImGui_ImplDX11_Init(g_pd3dDevice, g_pd3dDeviceContext);
 
-    std::thread renderThread([](HANDLE hProcess, uintptr_t moduleBase) {
+    std::thread([]() {
         MSG msg;
         ZeroMemory(&msg, sizeof(msg));
-        while (::GetMessage(&msg, NULL, 0U, 0U)) {
-            ::TranslateMessage(&msg);
-            ::DispatchMessage(&msg);
-            float clear_color[4] = {0.0f, 0.0f, 0.0f, 0.0f};
-            g_pd3dDeviceContext->ClearRenderTargetView(g_mainRenderTargetView, clear_color);
-            uintptr_t localPlayer = Memory::Read<uintptr_t>(hProcess, moduleBase + Offsets::dwLocalPlayerPawn);
-            RenderImGui(hProcess, moduleBase, localPlayer);
-            g_pSwapChain->Present(1, 0);
+
+        while (true) {
+            if (PeekMessage(&msg, NULL, 0U, 0U, PM_REMOVE)) {
+                TranslateMessage(&msg);
+                DispatchMessage(&msg);
+                if (msg.message == WM_QUIT) break;
+            }
+
+            RenderOverlay();
         }
-    }, hProcess, moduleBase);
-    renderThread.detach();
+    }).detach();
 
     return true;
 }
 
 void CleanupOverlay() {
-    ImGui_ImplDX11_Shutdown();
-    ImGui_ImplWin32_Shutdown();
-    ImGui::DestroyContext();
-    g_pSwapChain->Release();
-    g_mainRenderTargetView->Release();
-    g_pd3dDeviceContext->Release();
-    g_pd3dDevice->Release();
-    DestroyWindow(g_overlayWindow);
+    if (g_pd3dDevice) {
+        ImGui_ImplDX11_Shutdown();
+        ImGui_ImplWin32_Shutdown();
+        ImGui::DestroyContext();
+
+        if (g_mainRenderTargetView) g_mainRenderTargetView->Release();
+        if (g_pSwapChain) g_pSwapChain->Release();
+        if (g_pd3dDeviceContext) g_pd3dDeviceContext->Release();
+        if (g_pd3dDevice) g_pd3dDevice->Release();
+    }
+
+    if (g_overlayWindow) {
+        DestroyWindow(g_overlayWindow);
+    }
+
+    UnregisterClass(L"OverlayWindow", GetModuleHandle(NULL));
 }
