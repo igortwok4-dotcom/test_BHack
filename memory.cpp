@@ -1,5 +1,6 @@
 // memory.cpp
 #include "memory.h"
+#include <tlhelp32.h>
 #include <psapi.h>
 #include <vector>
 
