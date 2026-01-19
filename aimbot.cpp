@@ -1,4 +1,4 @@
-// aimbot.cpp
+#include <windows.h>
 #include "aimbot.h"
 #include "memory.h"
 #include "offsets.h"
