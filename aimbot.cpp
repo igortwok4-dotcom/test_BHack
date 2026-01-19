@@ -1,4 +1,3 @@
-// aimbot.cpp
 #include "aimbot.h"
 #include "memory.h"
 #include "offsets.h"
@@ -9,8 +8,8 @@ Vector3 CalcAngle(const Vector3& src, const Vector3& dst) {
     Vector3 delta = { dst.x - src.x, dst.y - src.y, dst.z - src.z };
     float hyp = sqrt(delta.x * delta.x + delta.y * delta.y);
     Vector3 angle;
-    angle.x = asinf(delta.z / hyp) * (180.0f / M_PI);
-    angle.y = atan2f(delta.y, delta.x) * (180.0f / M_PI);
+    angle.x = asinf(delta.z / hyp) * (180.0f / 3.14159265358979323846f);
+    angle.y = atan2f(delta.y, delta.x) * (180.0f / 3.14159265358979323846f);
     if (angle.y < 0) angle.y += 360.0f;
     angle.z = 0.0f;
     return angle;
@@ -39,7 +38,7 @@ void UpdateAimbot(HANDLE hProcess, uintptr_t moduleBase, uintptr_t localPlayer) 
     uintptr_t entityList = Memory::Read<uintptr_t>(hProcess, moduleBase + Offsets::dwEntityList);
 
     float closestDist = Config::aimbotFov;
-    Vector3 targetAngle;
+    Vector3 targetAngle = {};
 
     for (int i = 1; i < 64; ++i) {
         uintptr_t listEntry = Memory::Read<uintptr_t>(hProcess, entityList + i * 0x78);
