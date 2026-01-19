@@ -1,6 +1,5 @@
 // memory.cpp
 #include "memory.h"
-#include <tlhelp32.h>
 #include <psapi.h>
 #include <vector>
 
@@ -11,15 +10,16 @@ T Memory::Read(HANDLE hProcess, uintptr_t address) {
     return value;
 }
 
-// Explicit instantiations (for common types)
 template float Memory::Read<float>(HANDLE, uintptr_t);
 template int Memory::Read<int>(HANDLE, uintptr_t);
 template uintptr_t Memory::Read<uintptr_t>(HANDLE, uintptr_t);
-// Add more if needed
+template Vector3 Memory::Read<Vector3>(HANDLE, uintptr_t);
 
 uintptr_t Memory::FindSignature(HANDLE hProcess, uintptr_t start, uintptr_t size, const std::string& sig, const std::string& mask) {
     std::vector<byte> buffer(size);
-    ReadProcessMemory(hProcess, (LPCVOID)start, buffer.data(), size, NULL);
+    if (!ReadProcessMemory(hProcess, (LPCVOID)start, buffer.data(), size, NULL)) {
+        return 0;
+    }
 
     for (uintptr_t i = 0; i < size - sig.length(); ++i) {
         bool found = true;
