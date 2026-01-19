@@ -7,6 +7,7 @@
 #include "rcs.h"
 #include "memory.h"
 #include "offsets.h"
+#include <thread>
 
 HWND g_overlayWindow = NULL;
 ID3D11Device* g_pd3dDevice = NULL;
@@ -114,10 +115,10 @@ bool InitOverlay(HWND targetWindow) {
     RECT rect;
     GetWindowRect(targetWindow, &rect);
 
-    WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, WndProc, 0L, 0L, GetModuleHandle(NULL), NULL, NULL, (HBRUSH)GetStockObject(BLACK_BRUSH), NULL, L"OverlayWindow", NULL };
+    WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, WndProc, 0L, 0L, GetModuleHandle(NULL), NULL, NULL, (HBRUSH)GetStockObject(BLACK_BRUSH), NULL, "OverlayWindow", NULL };
     RegisterClassEx(&wc);
 
-    g_overlayWindow = CreateWindowEx(WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_LAYERED, L"OverlayWindow", L"Overlay", WS_POPUP,
+    g_overlayWindow = CreateWindowEx(WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_LAYERED, "OverlayWindow", "Overlay", WS_POPUP,
         rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top,
         NULL, NULL, wc.hInstance, NULL);
 
@@ -176,5 +177,5 @@ void CleanupOverlay() {
         DestroyWindow(g_overlayWindow);
     }
 
-    UnregisterClass(L"OverlayWindow", GetModuleHandle(NULL));
+    UnregisterClass("OverlayWindow", GetModuleHandle(NULL));
 }
