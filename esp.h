@@ -3,10 +3,7 @@
 
 #include <windows.h>
 #include <cstdint>  // для uintptr_t
-
-struct Vector3 {
-    float x, y, z;
-};
+#include <memory.h>
 
 struct Vector2 {
     float x, y;
