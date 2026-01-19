@@ -1,34 +1,35 @@
-// offsets.h
 #ifndef OFFSETS_H
 #define OFFSETS_H
 
 #include <windows.h>
+#include <cstdint>
 
 struct Vector3 {
     float x, y, z;
+
+    Vector3 operator-(const Vector3& other) const {
+        return { x - other.x, y - other.y, z - other.z };
+    }
 };
 
 namespace Offsets {
-    extern uintptr_t dwLocalPlayerPawn;
-    extern uintptr_t dwEntityList;
-    extern uintptr_t dwViewMatrix;
-    extern uintptr_t m_iHealth;
-    extern uintptr_t m_iTeamNum;
-    extern uintptr_t m_vecOrigin;
-    extern uintptr_t m_aimPunchAngle;
-    extern uintptr_t m_pGameSceneNode;
-    extern uintptr_t m_modelState;
-    extern uintptr_t m_boneArray;
-    extern uintptr_t v_angle;
+    inline uintptr_t dwLocalPlayerPawn   = 0x1B0A3A0;
+    inline uintptr_t dwEntityList        = 0x1E0E7D0;
+    inline uintptr_t dwViewMatrix        = 0x1EA3B60;
 
-    extern std::string sigLocalPlayerPawn;
-    extern std::string maskLocalPlayerPawn;
-    extern std::string sigEntityList;
-    extern std::string maskEntityList;
-    extern std::string sigViewMatrix;
-    extern std::string maskViewMatrix;
+    inline uintptr_t m_iHealth           = 0x334;
+    inline uintptr_t m_iTeamNum          = 0x3C3;
+    inline uintptr_t m_vecOrigin         = 0x12CC;
+    inline uintptr_t m_aimPunchAngle     = 0x1784;
+    inline uintptr_t m_pGameSceneNode    = 0x320;
+    inline uintptr_t m_modelState        = 0x170;
+    inline uintptr_t m_boneArray         = 0x80;
+
+    inline uintptr_t m_hObserverTarget   = 0x34B0;
+
+    inline uintptr_t v_angle             = 0x23B0;
 
     void Init(uintptr_t moduleBase, HANDLE hProcess);
 }
 
-#endif
+#endif // OFFSETS_H
