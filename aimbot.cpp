@@ -2,7 +2,7 @@
 #include "aimbot.h"
 #include "memory.h"
 #include "offsets.h"
-#include <user32.h> // For mouse_event
+#include <user32.h>
 #include <cmath>
 
 Vector3 CalcAngle(const Vector3& src, const Vector3& dst) {
