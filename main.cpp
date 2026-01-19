@@ -1,8 +1,3 @@
-// main.cpp
-// This is a simple external cheat for CS2 for testing anti-cheat only.
-// Compile with MinGW-w64: x86_64-w64-mingw32-g++ -o cheat.exe main.cpp memory.cpp esp.cpp aimbot.cpp rcs.cpp -mwindows -lpsapi -luser32 -static
-// Run on Windows where CS2 is running.
-
 #include <windows.h>
 #include <tlhelp32.h>
 #include <psapi.h>
