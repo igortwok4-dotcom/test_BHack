@@ -118,7 +118,7 @@ bool InitOverlay(HWND targetWindow) {
     WNDCLASSEX wc = { sizeof(WNDCLASSEX), CS_CLASSDC, WndProc, 0L, 0L, GetModuleHandle(NULL), NULL, NULL, (HBRUSH)GetStockObject(BLACK_BRUSH), NULL, "OverlayWindow", NULL };
     RegisterClassEx(&wc);
 
-    g_overlayWindow = CreateWindowEx(WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_LAYERED, "OverlayWindow", "Overlay", WS_POPUP,
+    g_overlayWindow = CreateWindowExA(WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_LAYERED, "OverlayWindow", "Overlay", WS_POPUP,
         rect.left, rect.top, rect.right - rect.left, rect.bottom - rect.top,
         NULL, NULL, wc.hInstance, NULL);
 
@@ -148,9 +148,9 @@ bool InitOverlay(HWND targetWindow) {
         ZeroMemory(&msg, sizeof(msg));
 
         while (true) {
-            if (PeekMessage(&msg, NULL, 0U, 0U, PM_REMOVE)) {
+            if (PeekMessageA(&msg, NULL, 0U, 0U, PM_REMOVE)) {
                 TranslateMessage(&msg);
-                DispatchMessage(&msg);
+                DispatchMessageA(&msg);
                 if (msg.message == WM_QUIT) break;
             }
 
@@ -177,5 +177,5 @@ void CleanupOverlay() {
         DestroyWindow(g_overlayWindow);
     }
 
-    UnregisterClass("OverlayWindow", GetModuleHandle(NULL));
+    UnregisterClassA("OverlayWindow", GetModuleHandle(NULL));
 }
