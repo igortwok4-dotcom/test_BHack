@@ -1,41 +1,40 @@
-#include <windows.h>
+// aimbot.cpp
 #include "aimbot.h"
 #include "memory.h"
 #include "offsets.h"
-#include <user32.h>
+#include <winuser.h>
 #include <cmath>
 
 Vector3 CalcAngle(const Vector3& src, const Vector3& dst) {
+    Vector3 delta = { dst.x - src.x, dst.y - src.y, dst.z - src.z };
+    float hyp = sqrt(delta.x * delta.x + delta.y * delta.y);
     Vector3 angle;
-    float deltaX = dst.x - src.x;
-    float deltaY = dst.y - src.y;
-    float deltaZ = dst.z - src.z;
-    float hyp = sqrt(deltaX*deltaX + deltaY*deltaY + deltaZ*deltaZ);
-    angle.x = asinf(deltaZ / hyp) * (180.0f / M_PI);
-    angle.y = atan2f(deltaY, deltaX) * (180.0f / M_PI);
-    angle.z = 0;
+    angle.x = asinf(delta.z / hyp) * (180.0f / M_PI);
+    angle.y = atan2f(delta.y, delta.x) * (180.0f / M_PI);
+    if (angle.y < 0) angle.y += 360.0f;
+    angle.z = 0.0f;
     return angle;
 }
 
 Vector3 GetBonePos(HANDLE hProcess, uintptr_t player, int bone) {
-    uintptr_t boneMatrix = Memory::Read<uintptr_t>(hProcess, player + Offsets::m_hBoneMatrix);
+    uintptr_t gameSceneNode = Memory::Read<uintptr_t>(hProcess, player + Offsets::m_pGameSceneNode);
+    uintptr_t boneMatrix = Memory::Read<uintptr_t>(hProcess, gameSceneNode + Offsets::m_modelState + Offsets::m_boneArray);
     Vector3 bonePos;
-    bonePos.x = Memory::Read<float>(hProcess, boneMatrix + (0x30 * bone) + 0x0C);
-    bonePos.y = Memory::Read<float>(hProcess, boneMatrix + (0x30 * bone) + 0x1C);
-    bonePos.z = Memory::Read<float>(hProcess, boneMatrix + (0x30 * bone) + 0x2C);
+    bonePos.x = Memory::Read<float>(hProcess, boneMatrix + 0x30 * bone + 0x0C);
+    bonePos.y = Memory::Read<float>(hProcess, boneMatrix + 0x30 * bone + 0x1C);
+    bonePos.z = Memory::Read<float>(hProcess, boneMatrix + 0x30 * bone + 0x2C);
     return bonePos;
 }
 
 bool IsVisible(HANDLE hProcess, uintptr_t player) {
-    // Simple check, implement real vischeck if needed
     return true;
 }
 
 void UpdateAimbot(HANDLE hProcess, uintptr_t moduleBase, uintptr_t localPlayer) {
-    if (!(GetAsyncKeyState(VK_RBUTTON) & 0x8000)) return; // Hold right mouse
+    if (!(GetAsyncKeyState(VK_RBUTTON) & 0x8000)) return;
 
     Vector3 localPos = Memory::Read<Vector3>(hProcess, localPlayer + Offsets::m_vecOrigin);
-    Vector3 localView = Memory::Read<Vector3>(hProcess, localPlayer + Offsets::clientState_ViewAngles); // Need clientState offset
+    Vector3 localView = Memory::Read<Vector3>(hProcess, localPlayer + Offsets::v_angle);
 
     uintptr_t entityList = Memory::Read<uintptr_t>(hProcess, moduleBase + Offsets::dwEntityList);
 
@@ -43,7 +42,9 @@ void UpdateAimbot(HANDLE hProcess, uintptr_t moduleBase, uintptr_t localPlayer) 
     Vector3 targetAngle;
 
     for (int i = 1; i < 64; ++i) {
-        uintptr_t player = Memory::Read<uintptr_t>(hProcess, entityList + i * 0x10);
+        uintptr_t listEntry = Memory::Read<uintptr_t>(hProcess, entityList + i * 0x78);
+        if (listEntry == 0) continue;
+        uintptr_t player = Memory::Read<uintptr_t>(hProcess, listEntry + 0x10);
         if (player == 0 || player == localPlayer) continue;
 
         int health = Memory::Read<int>(hProcess, player + Offsets::m_iHealth);
@@ -69,9 +70,8 @@ void UpdateAimbot(HANDLE hProcess, uintptr_t moduleBase, uintptr_t localPlayer) 
         Vector3 delta = targetAngle - localView;
         delta.x *= Config::aimbotSmooth;
         delta.y *= Config::aimbotSmooth;
-        // To set angles, but external: Simulate mouse movement
-        int dx = static_cast<int>(delta.y * 2); // Adjust multiplier
-        int dy = static_cast<int>(-delta.x * 2); // Y inverted?
+        int dx = static_cast<int>(delta.y * 2.0f);
+        int dy = static_cast<int>(delta.x * 2.0f);
         mouse_event(MOUSEEVENTF_MOVE, dx, dy, 0, 0);
     }
 }
