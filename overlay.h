@@ -1,4 +1,3 @@
-// overlay.h
 #ifndef OVERLAY_H
 #define OVERLAY_H
 
@@ -6,12 +5,13 @@
 #include <d3d11.h>
 #include <dxgi.h>
 
-bool InitOverlay(HWND targetWindow);
-void CleanupOverlay();
-
+extern HWND g_overlayWindow;
 extern ID3D11Device* g_pd3dDevice;
 extern ID3D11DeviceContext* g_pd3dDeviceContext;
 extern IDXGISwapChain* g_pSwapChain;
 extern ID3D11RenderTargetView* g_mainRenderTargetView;
 
-#endif
+bool InitOverlay(HWND targetWindow);
+void CleanupOverlay();
+
+#endif // OVERLAY_H
