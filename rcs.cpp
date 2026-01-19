@@ -1,4 +1,4 @@
-// rcs.cpp
+#include <windows.h>
 #include "rcs.h"
 #include "memory.h"
 #include "offsets.h"
